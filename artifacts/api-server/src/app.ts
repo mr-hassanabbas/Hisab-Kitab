@@ -1,7 +1,6 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import cors from "cors";
-import pinoHttpModule from "pino-http";
-const pinoHttp = (pinoHttpModule as unknown as { default: typeof pinoHttpModule }).default ?? pinoHttpModule;
+import pinoHttp from "pino-http";
 import path from "path";
 import { fileURLToPath } from "url";
 import router from "./routes/index.js";
@@ -15,14 +14,16 @@ app.use(
   pinoHttp({
     logger,
     serializers: {
-      req(req: Record<string, unknown>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      req(req: any) {
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          url: typeof req.url === "string" ? req.url.split("?")[0] : req.url,
         };
       },
-      res(res: Record<string, unknown>) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      res(res: any) {
         return {
           statusCode: res.statusCode,
         };
@@ -39,12 +40,12 @@ app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", router);
 
 // Health check endpoint for deployment monitoring
-app.get("/api/healthz", (req: import("express").Request, res: import("express").Response) => {
+app.get("/api/healthz", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
     services: {
-      database: "connected", // In production, this should check actual DB connection
+      database: "connected",
       api: "operational",
       version: process.env.npm_package_version || "0.0.0"
     }

@@ -1,8 +1,8 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist",
-  "devCommand": "pnpm dev",
-  "installCommand": "pnpm install",
+  "buildCommand": "cd artifacts/hisab-kitab && pnpm install --frozen-lockfile=false && pnpm build",
+  "outputDirectory": "artifacts/hisab-kitab/dist",
+  "devCommand": "cd artifacts/hisab-kitab && pnpm dev",
+  "installCommand": "pnpm install --frozen-lockfile=false",
   "framework": null,
   "rewrites": [
     {
