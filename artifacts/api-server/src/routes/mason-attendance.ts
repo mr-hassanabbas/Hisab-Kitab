@@ -32,7 +32,7 @@ router.get("/today", async (req, res) => {
     const theDate = date || getPKTDate();
     const mason = await queryAll(
       `SELECT m.*, pm.daily_wage as project_wage,
-              a.status as today_status, a.wage_for_day, a.advance_given, a.remarks as attendance_remarks, a.id as attendance_id
+              a.status as today_status, a.wage_for_day, a.overtime_hours, a.overtime_pay, a.advance_given, a.remarks as attendance_remarks, a.id as attendance_id
        FROM mason m
        JOIN project_mason pm ON pm.mason_id = m.id AND pm.project_id = ? AND pm.removed_at IS NULL
        LEFT JOIN mason_attendance a ON a.mason_id = m.id AND a.project_id = ? AND a.date = ?
@@ -45,13 +45,14 @@ router.get("/today", async (req, res) => {
 
 router.post("/", validateBody(insertMasonAttendanceSchema), async (req, res) => {
   try {
-    const { project_id, mason_id, date, status, advance_given = 0, remarks } = req.body as Record<string, unknown>;
+    const { project_id, mason_id, date, status, advance_given = 0, remarks, overtime_hours = 0 } = req.body as Record<string, unknown>;
     if (!project_id || !mason_id || !date || !status) {
       return res.status(400).json({ success: false, error: "project_id, mason_id, date, status required" });
     }
     if (!["present", "absent", "half_day"].includes(status as string)) {
       return res.status(400).json({ success: false, error: "status must be present/absent/half_day" });
     }
+    const otHours = Math.max(0, parseFloat(String(overtime_hours)) || 0);
     let pm = await queryGet<{ daily_wage: number }>(
       "SELECT daily_wage FROM project_mason WHERE mason_id = ? AND project_id = ? AND removed_at IS NULL",
       [mason_id, project_id]
@@ -66,8 +67,15 @@ router.post("/", validateBody(insertMasonAttendanceSchema), async (req, res) => 
       );
       pm = { daily_wage: baseWage };
     }
+    // Fetch this mason's overtime rate from their profile
+    const masonProfile = await queryGet<{ overtime_rate_per_hour: number }>(
+      "SELECT overtime_rate_per_hour FROM mason WHERE id = ?", [mason_id]
+    );
+    const otRate = masonProfile?.overtime_rate_per_hour ?? 0;
     const dailyWage = pm.daily_wage ?? 0;
-    const wageForDay = status === "present" ? dailyWage : status === "half_day" ? dailyWage / 2 : 0;
+    const baseWageForDay = status === "present" ? dailyWage : status === "half_day" ? dailyWage / 2 : 0;
+    const overtimePay = status !== "absent" ? otHours * otRate : 0;
+    const wageForDay = baseWageForDay + overtimePay;
     const now = getPKT();
     const existing = await queryGet<{ id: number }>(
       "SELECT id FROM mason_attendance WHERE project_id = ? AND mason_id = ? AND date = ?",
@@ -75,15 +83,15 @@ router.post("/", validateBody(insertMasonAttendanceSchema), async (req, res) => 
     );
     if (existing) {
       await dbExec(
-        "UPDATE mason_attendance SET status = ?, wage_for_day = ?, advance_given = ?, remarks = ? WHERE id = ?",
-        [status, wageForDay, advance_given, remarks ?? null, existing.id]
+        "UPDATE mason_attendance SET status = ?, wage_for_day = ?, overtime_hours = ?, overtime_pay = ?, advance_given = ?, remarks = ? WHERE id = ?",
+        [status, wageForDay, otHours, overtimePay, advance_given, remarks ?? null, existing.id]
       );
       const updated = await queryGet("SELECT * FROM mason_attendance WHERE id = ?", [existing.id]);
       return res.json({ success: true, data: updated, updated: true });
     }
     const { id } = await dbInsert(
-      "INSERT INTO mason_attendance (project_id, mason_id, date, status, wage_for_day, advance_given, remarks, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [project_id, mason_id, date, status, wageForDay, advance_given, remarks ?? null, now]
+      "INSERT INTO mason_attendance (project_id, mason_id, date, status, wage_for_day, overtime_hours, overtime_pay, advance_given, remarks, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [project_id, mason_id, date, status, wageForDay, otHours, overtimePay, advance_given, remarks ?? null, now]
     );
     const record = await queryGet("SELECT * FROM mason_attendance WHERE id = ?", [id]);
     res.status(201).json({ success: true, data: record });

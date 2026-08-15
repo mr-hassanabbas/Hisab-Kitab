@@ -12,10 +12,10 @@ import { useLanguage } from "@/hooks/use-language";
 
 interface LabourFormData {
   name: string; phone: string; cnic: string; fathers_name: string;
-  village: string; daily_wage: string; joining_date: string; remarks: string;
+  village: string; daily_wage: string; overtime_rate_per_hour: string; joining_date: string; remarks: string;
 }
 
-const emptyForm: LabourFormData = { name: "", phone: "", cnic: "", fathers_name: "", village: "", daily_wage: "", joining_date: "", remarks: "" };
+const emptyForm: LabourFormData = { name: "", phone: "", cnic: "", fathers_name: "", village: "", daily_wage: "", overtime_rate_per_hour: "", joining_date: "", remarks: "" };
 
 export default function Labour() {
   const { t } = useLanguage();
@@ -60,7 +60,11 @@ export default function Labour() {
 
   const saveMutation = useMutation({
     mutationFn: (d: LabourFormData) => {
-      const body = { ...d, daily_wage: d.daily_wage ? parseFloat(d.daily_wage) : undefined };
+      const body = { 
+        ...d, 
+        daily_wage: d.daily_wage ? parseFloat(d.daily_wage) : undefined,
+        overtime_rate_per_hour: d.overtime_rate_per_hour ? parseFloat(d.overtime_rate_per_hour) : undefined,
+      };
       return editId
         ? fetchApi(`/labour/${editId}`, { method: "PUT", body: JSON.stringify(body) })
         : fetchApi("/labour", { method: "POST", body: JSON.stringify(body) });
@@ -93,6 +97,7 @@ export default function Labour() {
       name: String(l.name ?? ""), phone: String(l.phone ?? ""), cnic: String(l.cnic ?? ""),
       fathers_name: String(l.fathers_name ?? ""), village: String(l.village ?? ""),
       daily_wage: l.daily_wage ? String(l.daily_wage) : "",
+      overtime_rate_per_hour: l.overtime_rate_per_hour ? String(l.overtime_rate_per_hour) : "",
       joining_date: String(l.joining_date ?? ""), remarks: String(l.remarks ?? ""),
     });
     setShowForm(true);
@@ -175,6 +180,7 @@ export default function Labour() {
                     {!!l.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{String(l.phone)}</span>}
                     {!!l.village && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{String(l.village)}</span>}
                     {!!l.daily_wage && <span className="font-medium text-foreground">{formatWage(l.daily_wage)}{t("per_day")}</span>}
+                    {!!l.overtime_rate_per_hour && <span className="text-amber-600 font-medium">{formatWage(l.overtime_rate_per_hour)}/hr OT</span>}
                   </div>
                 </Link>
                 <DropdownMenu>
@@ -210,6 +216,7 @@ export default function Labour() {
               ["fathers_name", t("fathers_name"), "text", ""],
               ["village", t("village_city"), "text", ""],
               ["daily_wage", t("daily_wage") + " *", "number", "0"],
+              ["overtime_rate_per_hour", "Overtime Rate (PKR/hr)", "number", "0"],
               ["joining_date", t("joining_date"), "date", ""],
             ].map(([key, label, type, placeholder]) => (
               <div key={key}>

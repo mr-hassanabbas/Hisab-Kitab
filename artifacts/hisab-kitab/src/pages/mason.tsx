@@ -12,10 +12,10 @@ import { useLanguage } from "@/hooks/use-language";
 
 interface MasonFormData {
   name: string; phone: string; cnic: string; fathers_name: string;
-  village: string; daily_wage: string; joining_date: string; remarks: string;
+  village: string; daily_wage: string; overtime_rate_per_hour: string; joining_date: string; remarks: string;
 }
 
-const emptyForm: MasonFormData = { name: "", phone: "", cnic: "", fathers_name: "", village: "", daily_wage: "", joining_date: "", remarks: "" };
+const emptyForm: MasonFormData = { name: "", phone: "", cnic: "", fathers_name: "", village: "", daily_wage: "", overtime_rate_per_hour: "", joining_date: "", remarks: "" };
 
 export default function Mason() {
   const { t } = useLanguage();
@@ -60,7 +60,11 @@ export default function Mason() {
 
   const saveMutation = useMutation({
     mutationFn: (d: MasonFormData) => {
-      const body = { ...d, daily_wage: d.daily_wage ? parseFloat(d.daily_wage) : undefined };
+      const body = { 
+        ...d, 
+        daily_wage: d.daily_wage ? parseFloat(d.daily_wage) : undefined,
+        overtime_rate_per_hour: d.overtime_rate_per_hour ? parseFloat(d.overtime_rate_per_hour) : undefined,
+      };
       return editId
         ? fetchApi(`/mason/${editId}`, { method: "PUT", body: JSON.stringify(body) })
         : fetchApi("/mason", { method: "POST", body: JSON.stringify(body) });
@@ -93,6 +97,7 @@ export default function Mason() {
       name: String(m.name ?? ""), phone: String(m.phone ?? ""), cnic: String(m.cnic ?? ""),
       fathers_name: String(m.fathers_name ?? ""), village: String(m.village ?? ""),
       daily_wage: m.daily_wage ? String(m.daily_wage) : "",
+      overtime_rate_per_hour: m.overtime_rate_per_hour ? String(m.overtime_rate_per_hour) : "",
       joining_date: String(m.joining_date ?? ""), remarks: String(m.remarks ?? ""),
     });
     setShowForm(true);
@@ -175,6 +180,7 @@ export default function Mason() {
                     {!!m.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{String(m.phone)}</span>}
                     {!!m.village && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{String(m.village)}</span>}
                     <span className="font-medium text-foreground">{formatWage(m.daily_wage)}{t("per_day")}</span>
+                    {!!m.overtime_rate_per_hour && <span className="text-amber-600 font-medium">{formatWage(m.overtime_rate_per_hour)}/hr OT</span>}
                   </div>
                 </Link>
                 <DropdownMenu>
@@ -210,6 +216,7 @@ export default function Mason() {
               ["fathers_name", t("fathers_name"), "text", ""],
               ["village", t("village_city"), "text", ""],
               ["daily_wage", t("daily_wage") + " *", "number", "0"],
+              ["overtime_rate_per_hour", "Overtime Rate (PKR/hr)", "number", "0"],
               ["joining_date", t("joining_date"), "date", ""],
             ].map(([key, label, type, placeholder]) => (
               <div key={key}>

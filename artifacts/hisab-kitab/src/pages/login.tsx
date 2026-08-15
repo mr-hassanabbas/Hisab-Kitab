@@ -177,11 +177,7 @@ export default function Login() {
           </div>
         ) : (
           <div>
-            <div className="flex items-center justify-between mb-5">
-              <button onClick={() => { setStep("recover"); setPin(""); }} className="text-primary text-sm font-medium">
-                Change number
-              </button>
-            </div>
+
             <p className="text-sm font-medium text-foreground mb-4 text-center">Enter your 4-digit PIN</p>
             <div className="flex justify-center gap-3 mb-7">
               {[0, 1, 2, 3].map((i) => (

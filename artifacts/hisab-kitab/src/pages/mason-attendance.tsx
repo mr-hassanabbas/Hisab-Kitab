@@ -19,6 +19,8 @@ interface MasonRow {
   id: number; name: string; daily_wage: number; project_wage: number;
   today_status: Status; wage_for_day: number; advance_given: number;
   attendance_id?: number; attendance_remarks?: string;
+  overtime_hours?: number; overtime_pay?: number;
+  overtime_rate_per_hour?: number;
 }
 
 const EXPENSE_CATEGORIES = ["Food", "Transport", "Fuel", "Tools", "Safety", "Other"];
@@ -48,6 +50,8 @@ function ProjectPanel({
   const [advances, setAdvances]           = useState<Record<number, string>>({});
   const [wages, setWages]                 = useState<Record<number, string>>({});
   const [remarks, setRemarks]             = useState<Record<number, string>>({});
+  const [overtimeHours, setOvertimeHours] = useState<Record<number, string>>({});
+  const [overtimeRate, setOvertimeRate]   = useState<Record<number, string>>({});
   const [pendingStatus, setPendingStatus] = useState<Record<number, Status>>({});
   const [rowSaving, setRowSaving]         = useState<Record<number, boolean>>({});
   const [savingAll, setSavingAll]         = useState(false);
@@ -84,12 +88,18 @@ function ProjectPanel({
       if (parsedAdvance < 0) {
         throw new Error(t("invalid_advance") || "Advance cannot be negative");
       }
+      const otHours = parseFloat(overtimeHours[row.id] ?? String(row.overtime_hours ?? 0)) || 0;
+      const otRate  = parseFloat(overtimeRate[row.id]  ?? String(row.overtime_rate_per_hour ?? 0)) || 0;
+      if (otHours < 0) throw new Error("Overtime hours cannot be negative");
+      if (otRate  < 0) throw new Error("Overtime rate cannot be negative");
+      if (otHours > 0 && otRate === 0) throw new Error("Enter rate (PKR/hr) when overtime hours > 0");
       const body = {
         project_id: parseInt(projectId),
         mason_id: row.id,
         date,
         status,
         advance_given: parsedAdvance,
+        overtime_hours: otHours,
         wage_for_day: wages[row.id] !== undefined ? (wages[row.id] === "" ? null : parseFloat(wages[row.id])) : undefined,
         attendance_remarks: remarks[row.id] !== undefined ? remarks[row.id] : undefined,
       };
@@ -283,40 +293,68 @@ function ProjectPanel({
                       {currentStatus !== "absent" && (
                         <div className="space-y-2 mt-2">
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[60px]">{t("advance")}:</label>
+                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[80px]">{t("advance")}:</label>
                             <input
                               type="number"
                               value={advances[row.id] ?? (row.advance_given > 0 ? String(row.advance_given) : "")}
                               onChange={(e) => setAdvances((a) => ({ ...a, [row.id]: e.target.value }))}
-                              onBlur={() => {
-                                if (currentStatus) markAttendance(row, currentStatus);
-                              }}
+                              onBlur={() => { if (currentStatus) markAttendance(row, currentStatus); }}
                               placeholder="0"
                               className="flex-1 px-2 py-1 rounded border border-input bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                             />
                           </div>
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[60px]">{t("custom_wage")}:</label>
+                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[80px]">{t("custom_wage")}:</label>
                             <input
                               type="number"
                               value={wages[row.id] ?? (row.wage_for_day ? String(row.wage_for_day) : "")}
                               onChange={(e) => setWages((a) => ({ ...a, [row.id]: e.target.value }))}
-                              onBlur={() => {
-                                if (currentStatus) markAttendance(row, currentStatus);
-                              }}
+                              onBlur={() => { if (currentStatus) markAttendance(row, currentStatus); }}
                               placeholder={t("leave_empty_default")}
                               className="flex-1 px-2 py-1 rounded border border-input bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                             />
                           </div>
+                          {/* ── Overtime ───────────────────────────────────── */}
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[60px]">{t("remarks")}:</label>
+                            <label className="text-xs text-amber-600 font-medium whitespace-nowrap min-w-[80px]">OT hrs:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={overtimeHours[row.id] ?? (row.overtime_hours ? String(row.overtime_hours) : "")}
+                              onChange={(e) => setOvertimeHours((a) => ({ ...a, [row.id]: e.target.value }))}
+                              onBlur={() => { if (currentStatus) markAttendance(row, currentStatus); }}
+                              placeholder="0"
+                              className="flex-1 px-2 py-1 rounded border border-amber-200 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-amber-600 font-medium whitespace-nowrap min-w-[80px]">OT rate/hr:</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={overtimeRate[row.id] ?? (row.overtime_rate_per_hour ? String(row.overtime_rate_per_hour) : "")}
+                              onChange={(e) => setOvertimeRate((a) => ({ ...a, [row.id]: e.target.value }))}
+                              onBlur={() => { if (currentStatus) markAttendance(row, currentStatus); }}
+                              placeholder="PKR/hr"
+                              className="flex-1 px-2 py-1 rounded border border-amber-200 bg-background text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            />
+                          </div>
+                          {/* Show computed overtime total when both are filled */}
+                          {(() => {
+                            const h = parseFloat(overtimeHours[row.id] ?? String(row.overtime_hours ?? 0)) || 0;
+                            const r = parseFloat(overtimeRate[row.id] ?? String(row.overtime_rate_per_hour ?? 0)) || 0;
+                            return h > 0 && r > 0 ? (
+                              <div className="text-xs text-amber-600 font-medium pl-[88px]">= PKR {(h * r).toLocaleString("en-PK")} overtime</div>
+                            ) : null;
+                          })()}
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[80px]">{t("remarks")}:</label>
                             <input
                               type="text"
                               value={remarks[row.id] ?? (row.attendance_remarks || "")}
                               onChange={(e) => setRemarks((a) => ({ ...a, [row.id]: e.target.value }))}
-                              onBlur={() => {
-                                if (currentStatus) markAttendance(row, currentStatus);
-                              }}
+                              onBlur={() => { if (currentStatus) markAttendance(row, currentStatus); }}
                               placeholder={t("optional_remarks")}
                               className="flex-1 px-2 py-1 rounded border border-input bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                             />

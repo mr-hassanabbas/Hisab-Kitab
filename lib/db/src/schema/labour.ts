@@ -11,6 +11,7 @@ export const labourTable = pgTable("labour", {
   village: text("village"),
   photo_path: text("photo_path"),
   daily_wage: real("daily_wage").default(0),
+  overtime_rate_per_hour: real("overtime_rate_per_hour").default(0),
   joining_date: text("joining_date"),
   remarks: text("remarks"),
   is_active: integer("is_active").notNull().default(1),
@@ -22,6 +23,7 @@ export const labourTable = pgTable("labour", {
 
 export const insertLabourSchema = createInsertSchema(labourTable, {
   daily_wage: z.coerce.number().optional(),
+  overtime_rate_per_hour: z.coerce.number().optional(),
 }).omit({ id: true, created_at: true });
 export type InsertLabour = z.infer<typeof insertLabourSchema>;
 export type Labour = typeof labourTable.$inferSelect;

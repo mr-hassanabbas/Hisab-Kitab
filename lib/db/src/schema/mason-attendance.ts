@@ -9,6 +9,8 @@ export const masonAttendanceTable = pgTable("mason_attendance", {
   date: text("date").notNull(),
   status: text("status").notNull(),
   wage_for_day: real("wage_for_day").notNull().default(0),
+  overtime_hours: real("overtime_hours").notNull().default(0),
+  overtime_pay: real("overtime_pay").notNull().default(0),
   advance_given: real("advance_given").notNull().default(0),
   remarks: text("remarks"),
   created_at: text("created_at").notNull().default("now"),
@@ -22,6 +24,7 @@ export const insertMasonAttendanceSchema = createInsertSchema(masonAttendanceTab
   project_id: z.coerce.number(),
   mason_id: z.coerce.number(),
   advance_given: z.coerce.number().optional(),
-}).omit({ id: true, created_at: true, wage_for_day: true }).extend({
+  overtime_hours: z.coerce.number().min(0).optional(),
+}).omit({ id: true, created_at: true, wage_for_day: true, overtime_pay: true }).extend({
   date: z.string().refine((val) => new Date(val) <= new Date(), { message: "Date cannot be in the future" }),
 });

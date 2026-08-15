@@ -164,7 +164,8 @@ export default function GuideChat({ variant }: GuideChatProps) {
     queryFn: () => fetchApi("/mason?limit=1000"),
     staleTime: 60_000,
   });
-  const maso: { name: string }[] = (masonData?.data ?? []).map((m: Record<string, unknown>) => ({
+  const maso: { id: number; name: string }[] = (masonData?.data ?? []).map((m: Record<string, unknown>) => ({
+    id: Number(m.id),
     name: String(m.name),
   }));
 

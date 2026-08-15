@@ -23,7 +23,9 @@ router.get("/project/:id", async (req, res) => {
               COUNT(CASE WHEN a.status='half_day' THEN 1 END) as half_days,
               COUNT(CASE WHEN a.status='absent' THEN 1 END) as absent_days,
               COALESCE(SUM(COALESCE(a.wage_for_day, 0)), 0) as total_wages,
-              COALESCE(SUM(a.advance_given), 0) as total_advance
+              COALESCE(SUM(a.advance_given), 0) as total_advance,
+              COALESCE(SUM(a.overtime_hours), 0) as total_overtime_hours,
+              COALESCE(SUM(a.overtime_pay), 0) as total_overtime_pay
        FROM project_labour pl
        JOIN labour l ON l.id = pl.labour_id
        LEFT JOIN attendance a ON a.labour_id = pl.labour_id AND a.project_id = pl.project_id ${sd} ${ed}

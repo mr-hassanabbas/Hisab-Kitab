@@ -123,6 +123,8 @@ export default function Reports() {
           { header: "Present Days", width: 14 },
           { header: "Half Days", width: 12 },
           { header: "Absent Days", width: 12 },
+          { header: "OT Hours", width: 12 },
+          { header: "OT Pay (PKR)", width: 16 },
           { header: "Total Wages (PKR)", width: 18 },
           { header: "Advance (PKR)", width: 16 },
         ];
@@ -135,10 +137,12 @@ export default function Reports() {
             Number(l.present_days ?? 0),
             Number(l.half_days ?? 0),
             Number(l.absent_days ?? 0),
+            Number(l.total_overtime_hours ?? 0),
+            Number(l.total_overtime_pay ?? 0),
             Number(l.total_wages ?? 0),
             Number(l.total_advance ?? 0),
           ]);
-          [3, 7, 8].forEach((ci) => { r.getCell(ci).numFmt = "#,##0"; });
+          [3, 8, 9, 10].forEach((ci) => { r.getCell(ci).numFmt = "#,##0"; });
         });
         // Totals row
         const totalsR = ws1.addRow([
@@ -146,11 +150,13 @@ export default function Reports() {
           labourRows.reduce((s, l) => s + Number(l.present_days ?? 0), 0),
           labourRows.reduce((s, l) => s + Number(l.half_days ?? 0), 0),
           labourRows.reduce((s, l) => s + Number(l.absent_days ?? 0), 0),
+          labourRows.reduce((s, l) => s + Number(l.total_overtime_hours ?? 0), 0),
+          labourRows.reduce((s, l) => s + Number(l.total_overtime_pay ?? 0), 0),
           labourRows.reduce((s, l) => s + Number(l.total_wages ?? 0), 0),
           labourRows.reduce((s, l) => s + Number(l.total_advance ?? 0), 0),
         ]);
         totalsR.font = { bold: true };
-        [7, 8].forEach((ci) => { totalsR.getCell(ci).numFmt = "#,##0"; });
+        [8, 9, 10].forEach((ci) => { totalsR.getCell(ci).numFmt = "#,##0"; });
       }
 
       // ── Sheet 3: Materials ──────────────────────────────────────
@@ -397,22 +403,25 @@ export default function Reports() {
         doc.text(`${t("labour")} ${t("summary")}`, 14, afterPrev);
         autoTable(doc, {
           startY: afterPrev + 3,
-          head: [[t("worker"), t("present"), t("half_days"), t("absent"), `${t("total_cost")} (PKR)`, `${t("advance")} (PKR)`]],
+          head: [[t("worker"), t("present"), t("half_days"), t("absent"), "OT Hrs", "OT Pay (PKR)", `${t("total_cost")} (PKR)`, `${t("advance")} (PKR)`]],
           body: labourRows.map((l) => [
             String(l.name ?? ""),
             String(Number(l.present_days ?? 0)),
             String(Number(l.half_days ?? 0)),
             String(Number(l.absent_days ?? 0)),
+            String(Number(l.total_overtime_hours ?? 0)),
+            Number(l.total_overtime_pay ?? 0).toLocaleString("en-PK"),
             Number(l.total_wages ?? 0).toLocaleString("en-PK"),
             Number(l.total_advance ?? 0).toLocaleString("en-PK"),
           ]),
           foot: [[
-            t("total"), "", "", "",
+            t("total"), "", "", "", "",
+            labourRows.reduce((s, l) => s + Number(l.total_overtime_pay ?? 0), 0).toLocaleString("en-PK"),
             labourRows.reduce((s, l) => s + Number(l.total_wages ?? 0), 0).toLocaleString("en-PK"),
             labourRows.reduce((s, l) => s + Number(l.total_advance ?? 0), 0).toLocaleString("en-PK"),
           ]],
           ...tableOptions,
-          columnStyles: { 4: { halign: "right" }, 5: { halign: "right" } },
+          columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
         });
       }
 
@@ -686,7 +695,7 @@ export default function Reports() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        {["Worker","Present","Half Days","Absent","Total Wages","Advance"].map((h) => (
+                        {["Worker","Present","Half Days","Absent","OT Hrs","OT Pay","Total Wages","Advance"].map((h) => (
                           <th key={h} className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground last:pr-0">{h}</th>
                         ))}
                       </tr>
@@ -698,6 +707,8 @@ export default function Reports() {
                           <td className="py-2 pr-4 text-muted-foreground">{Number(l.present_days ?? 0)}</td>
                           <td className="py-2 pr-4 text-muted-foreground">{Number(l.half_days ?? 0)}</td>
                           <td className="py-2 pr-4 text-muted-foreground">{Number(l.absent_days ?? 0)}</td>
+                          <td className="py-2 pr-4 text-muted-foreground">{Number(l.total_overtime_hours ?? 0)}</td>
+                          <td className="py-2 pr-4 text-amber-600 font-medium">{PKR(l.total_overtime_pay)}</td>
                           <td className="py-2 pr-4 font-medium">{PKR(l.total_wages)}</td>
                           <td className="py-2 text-orange-600">{PKR(l.total_advance)}</td>
                         </tr>

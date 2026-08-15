@@ -9,6 +9,8 @@ export const attendanceTable = pgTable("attendance", {
   date: text("date").notNull(),
   status: text("status").notNull(),
   wage_for_day: real("wage_for_day").notNull().default(0),
+  overtime_hours: real("overtime_hours").notNull().default(0),
+  overtime_pay: real("overtime_pay").notNull().default(0),
   advance_given: real("advance_given").notNull().default(0),
   remarks: text("remarks"),
   deleted_at: text("deleted_at"),
@@ -26,6 +28,7 @@ export const insertAttendanceSchema = createInsertSchema(attendanceTable, {
   project_id: z.coerce.number(),
   labour_id: z.coerce.number(),
   advance_given: z.coerce.number().optional(),
-}).omit({ id: true, created_at: true, wage_for_day: true, deleted_at: true }).extend({
+  overtime_hours: z.coerce.number().min(0).optional(),
+}).omit({ id: true, created_at: true, wage_for_day: true, overtime_pay: true, deleted_at: true }).extend({
   date: z.string().refine((val) => new Date(val) <= new Date(), { message: "Date cannot be in the future" }),
 });

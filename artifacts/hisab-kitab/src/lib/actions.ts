@@ -12,7 +12,7 @@ export type MareniiAction =
   | (ActionBase & { type: "add_material"; projectName?: string; material?: string; quantity?: string; unit?: string; rate?: string; supplier?: string })
   | (ActionBase & { type: "add_expense"; projectName?: string; category?: string; description?: string; amount?: string; paidTo?: string })
   | (ActionBase & { type: "add_equipment"; projectName?: string; equipment?: string; dailyRate?: string; operator?: string })
-  | (ActionBase & { type: "mark_attendance"; projectName?: string; labourName?: string; status?: string })
+  | (ActionBase & { type: "mark_attendance"; projectName?: string; labourName?: string; status?: string; overtimeHours?: string })
   | (ActionBase & { type: "mark_all_attendance"; projectName?: string; status?: string })
   | (ActionBase & { type: "add_diary"; projectName?: string; summary?: string; weather?: string })
   | (ActionBase & { type: "add_payment"; projectName?: string; amount?: string; method?: string })
@@ -88,11 +88,12 @@ const COMMAND_KEYWORDS = [
   // nouns/pages — english
   "project", "attendance", "hazri", "expense", "expenses", "kharch", "payment", "payments", "material", "materials",
   "equipment", "labour", "mazdoor", "worker", "diary", "photo", "photos", "report", "reports", "settings", "weekly",
+  "overtime", "ot",
   // nouns/pages — urdu
   "پروجیکٹ", "حاضری", "خرچہ", "اخراجات", "ادائیگی", "سامان", "مٹیریل", "آلات", "مزدور", "ڈائری", "تصاویر", "رپورٹ",
-  "تنخواہ", "حساب", "کام", "اوزار",
+  "تنخواہ", "حساب", "کام", "اوزار", "اوورٹائم", "اوور ٹائم",
   // nouns/pages — roman urdu
-  "project", "samaan", "mal", "aylaat", "tankhwa", "hisaab", "kaam",
+  "project", "samaan", "mal", "aylaat", "tankhwa", "hisaab", "kaam", "overtime",
 ];
 
 export function looksLikeCommand(text: string): boolean {
@@ -393,6 +394,23 @@ const extractName = (tail: string): string | undefined => {
   return tokens.join(" ") || undefined;
 };
 
+export function extractOvertimeHours(text: string): string | undefined {
+  const normalized = text.toLowerCase();
+  const re1 = /(\d+(?:\.\d+)?)\s*(?:ghante|ghanta|ghantey|hours|hour|گھنٹے|گھنٹہ|گھنٹوں)\s*(?:overtime|ot|اوورٹائم|اوور ٹائم)/i;
+  const m1 = normalized.match(re1);
+  if (m1) return m1[1];
+
+  const re2 = /(?:overtime|ot|اوورٹائم|اوور ٹائم)\s*(?:of|ka|ki|ke|کا|کی|کے)?\s*(\d+(?:\.\d+)?)\s*(?:ghante|ghanta|ghantey|hours|hour|گھنٹے|گھنٹہ|گھنٹوں)/i;
+  const m2 = normalized.match(re2);
+  if (m2) return m2[1];
+  
+  const re3 = /(\d+(?:\.\d+)?)\s*(?:overtime|ot|اوورٹائم|اوور ٹائم)/i;
+  const m3 = normalized.match(re3);
+  if (m3) return m3[1];
+  
+  return undefined;
+};
+
 const extractMultiWord = (tail: string, stop: RegExp): string | undefined => {
   const cleaned = stripQuotes(tail);
   const idx = cleaned.search(stop);
@@ -652,7 +670,28 @@ const parseOneClause = (clause: string): MareniiAction | null => {
     const rawName = am[1]?.trim().replace(/\s+/g, " ");
     const labourName = rawName ? (extractName(rawName) ?? rawName.split(/\s+/)[0]) : undefined;
     const status = mapAttendanceStatus(am[2]);
-    return { type: "mark_attendance", labourName, status, ...(resolveDate(t) ?? {}), response: `${labourName ?? "مزدور"} کی حاضری لگائی جائے گی` };
+    const otHours = extractOvertimeHours(t);
+    return { type: "mark_attendance", labourName, status, overtimeHours: otHours, ...(resolveDate(t) ?? {}), response: `${labourName ?? "مزدور"} کی حاضری لگائی جائے گی` };
+  }
+
+  // Check if it's an overtime clause
+  const otHours = extractOvertimeHours(t);
+  if (otHours) {
+    const otNameRe = /([\w\u0600-\u06FF\s]+?)\s*(?:ka|ki|ke|کا|کی|کے)?\s*(?:\d+(?:\.\d+)?\s*(?:ghante|ghanta|ghantey|hours|hour|گھنٹے|گھنٹہ|گھنٹوں)\s*)?(?:overtime|ot|اوورٹائم|اوور ٹائم)/i;
+    const otNameRe2 = /(?:overtime|ot|اوورٹائم|اوور ٹائم)\s*(?:of|ka|ki|ke|کا|کی|کے)?\s*([\w\u0600-\u06FF\s]+)/i;
+    const otM = t.match(otNameRe) ?? t.match(otNameRe2);
+    if (otM) {
+      const rawName = otM[1]?.trim().replace(/\s+/g, " ");
+      const labourName = rawName ? (extractName(rawName) ?? rawName.split(/\s+/)[0]) : undefined;
+      return { 
+        type: "mark_attendance", 
+        labourName, 
+        status: "present", 
+        overtimeHours: otHours,
+        ...(resolveDate(t) ?? {}), 
+        response: `${labourName ?? "مزدور/مستری"} کا ${otHours} گھنٹے اوورٹائم لگایا جائے گا` 
+      };
+    }
   }
 
   // ── add_expense ──
@@ -1450,22 +1489,66 @@ export async function executeActions(actions: MareniiAction[], opts: ExecuteOpti
         case "mark_attendance": {
           const pid = await project(a);
           if (halted) return confirmations;
-          const lid = await labour(a);
-          if (halted) return confirmations;
-          if (pid && lid) {
+          const statedWorker = a.labourName;
+          const rLab = await resolveLabourId(statedWorker, labourLast());
+          const rMas = await resolveMasonId(statedWorker, masonLast());
+          
+          let isMason = false;
+          let workerResult: ResolveResult | null = null;
+          
+          if (rLab.id && !rMas.id) {
+            workerResult = rLab;
+            isMason = false;
+          } else if (rMas.id && !rLab.id) {
+            workerResult = rMas;
+            isMason = true;
+          } else if (rLab.id && rMas.id) {
+            if (rMas.confidence === "high" && rLab.confidence !== "high") {
+              workerResult = rMas;
+              isMason = true;
+            } else {
+              workerResult = rLab;
+              isMason = false;
+            }
+          }
+          
+          if (!workerResult) {
+            const candidates = Array.from(new Set([...rLab.candidates, ...rMas.candidates]));
+            return halt({
+              entityType: "labour",
+              field: "labourName",
+              question: "کون سا مزدور یا مستری؟",
+              candidates,
+            });
+          }
+          
+          if (isMason) {
+            lastMasonId = workerResult.id;
+            if (workerResult.matchName) lastMasonName = workerResult.matchName;
+          } else {
+            lastLabourId = workerResult.id;
+            if (workerResult.matchName) lastLabourName = workerResult.matchName;
+          }
+          
+          if (pid && workerResult.id) {
             const date = resolveAttendanceDate(a);
             if (date === null) { askDate(); return confirmations; }
-            await fetchApi("/attendance", {
+            const otHours = a.overtimeHours ? parseFloat(a.overtimeHours) : 0;
+            const endpoint = isMason ? "/mason-attendance" : "/attendance";
+            const bodyKey = isMason ? "mason_id" : "labour_id";
+            await fetchApi(endpoint, {
               method: "POST",
               body: JSON.stringify({
                 project_id: pid.id,
-                labour_id: lid.id,
+                [bodyKey]: workerResult.id,
                 date,
                 status: mapAttendanceStatus(a.status),
+                overtime_hours: otHours,
               }),
             });
+            const otText = otHours > 0 ? ` (${otHours} گھنٹے اوورٹائم)` : "";
             confirmations.push({
-              text: (a.response || "حاضری لگا دی گئی") + note(pid, a.projectName) + note(lid, a.labourName) + assumedNote(a),
+              text: (a.response || `${isMason ? "مستری" : "مزدور"} کی حاضری${otText} لگا دی گئی`) + note(pid, a.projectName) + note(workerResult, a.labourName) + assumedNote(a),
               success: true,
             });
           }
@@ -1671,7 +1754,7 @@ ACTIONS YOU CAN DO:
 7. add_material — ADD material purchase (projectName, material, quantity, unit, rate, supplier)
 8. add_expense — ADD expense (projectName, amount, category, description, paidTo)
 9. add_equipment — ADD equipment (projectName, equipment, dailyRate, operator)
-10. mark_attendance — record attendance (projectName, labourName, status)
+10. mark_attendance — record attendance (projectName, labourName, status, overtimeHours)
 11. mark_all_attendance — mark all workers (projectName, status)
 12. add_diary — ADD diary note (projectName, summary, weather)
 13. add_payment — ADD owner payment (projectName, amount, method)
@@ -1689,7 +1772,7 @@ EXTRACT FORM DATA:
 - Material: material name (cement, sand, steel), quantity, unit (bags/tons/kg), rate, supplier
 - Expense: kharch kis liye, category (Food, Transport, Tools, Fuel, Labour (Extra), Repair, Safety, Office, Utility, Other)
 - Equipment: equipment name, dailyRate, operator
-- Attendance: labourName, status (present/absent/half_day, default present)
+- Attendance: labourName, status (present/absent/half_day, default present), overtimeHours (number of hours, e.g. 2, 1.5)
 - Payment: amount, method (bank/cash)
 
 DATE RULES:
