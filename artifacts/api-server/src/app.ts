@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from "express";
+import express, { type RequestHandler } from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
 import path from "path";
@@ -40,17 +40,17 @@ app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", router);
 
 // Health check endpoint for deployment monitoring
-app.get("/api/healthz", (_req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    services: {
-      database: "connected",
-      api: "operational",
-      version: process.env.npm_package_version || "0.0.0"
-    }
-  });
-});
-
+const healthzHandler: RequestHandler = (_req, res) => {
+     res.json({
+       status: "ok",
+       timestamp: new Date().toISOString(),
+       services: {
+         database: "connected",
+         api: "operational",
+         version: process.env.npm_package_version || "0.0.0"
+       }
+     });
+   };
+   app.get("/api/healthz", healthzHandler);
 export default app;
 
