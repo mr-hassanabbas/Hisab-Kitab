@@ -1,6 +1,8 @@
 {
   "framework": "vite",
-  "outputDirectory": "dist",
+  "buildCommand": "pnpm --filter ./artifacts/hisab-kitab run build",
+  "outputDirectory": "artifacts/hisab-kitab/dist",
+  "installCommand": "pnpm install --frozen-lockfile=false",
   "rewrites": [
     {
       "source": "/api/:path*",
