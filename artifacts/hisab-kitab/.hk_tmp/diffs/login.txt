@@ -1,0 +1,165 @@
+--- /home/hassanabbas/Hisab-Kitab/artifacts/hisab-kitab/.hk_tmp/orig_login.tsx	2026-08-15 11:38:35.873271537 +0500
++++ /home/hassanabbas/Hisab-Kitab/artifacts/hisab-kitab/src/pages/login.tsx	2026-08-15 10:57:22.030566771 +0500
+@@ -5,22 +5,42 @@
+ import { cn } from "@/lib/utils";
+ import { useToast } from "@/hooks/use-toast";
+ 
++const MOBILE_KEY = "hk_mobile";
++
++// Shared PIN/mobile number pad layout
++const NUMPAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
++
+ export default function Login() {
+   const { login } = useAuth();
+   const [, setLocation] = useLocation();
+   const { toast } = useToast();
+-  const [mobile, setMobile] = useState("");
++
++  // The mobile number is only collected on the recovery step. If a number was
++  // persisted on a previous device login, go straight to the PIN-only screen.
++  const persistedMobile =
++    typeof window !== "undefined" ? window.localStorage.getItem(MOBILE_KEY) : null;
++
++  const [mobile, setMobile] = useState(persistedMobile ?? "");
+   const [pin, setPin] = useState("");
+   const [loading, setLoading] = useState(false);
+   const [splashDone, setSplashDone] = useState(false);
+-  const [step, setStep] = useState<"mobile" | "pin">("mobile");
++  const [step, setStep] = useState<"recover" | "pin">(
++    persistedMobile ? "pin" : "recover"
++  );
+ 
+   useEffect(() => {
+     const t = setTimeout(() => setSplashDone(true), 2000);
+     return () => clearTimeout(t);
+   }, []);
+ 
+-  const handleMobileSubmit = () => {
++  // ── Recovery: mobile number entry ─────────────────────────────────
++  const handleMobileDigit = (d: string) => {
++    setMobile((m) => (m.length < 11 ? m + d : m));
++  };
++
++  const handleMobileDelete = () => setMobile((m) => m.slice(0, -1));
++
++  const submitMobile = () => {
+     const clean = mobile.replace(/[\s-]/g, "");
+     if (!/^03\d{9}$/.test(clean)) {
+       toast({ title: "Invalid mobile number", description: "Enter format: 03XXXXXXXXX", variant: "destructive" });
+@@ -29,16 +49,12 @@
+     setStep("pin");
+   };
+ 
+-  const handleMobileDigit = (d: string) => {
+-    setMobile((m) => (m.length < 11 ? m + d : m));
+-  };
+-
+-  const handleMobileDelete = () => setMobile((m) => m.slice(0, -1));
+-
++  // Auto-advance once a complete number is entered on the recovery screen
+   useEffect(() => {
+-    if (mobile.length === 11) handleMobileSubmit();
+-  }, [mobile]);
++    if (step === "recover" && mobile.length === 11) submitMobile();
++  }, [mobile, step]);
+ 
++  // ── PIN entry ─────────────────────────────────────────────────────
+   const handlePinDigit = (d: string) => {
+     if (pin.length < 4) setPin((p) => p + d);
+   };
+@@ -56,8 +72,14 @@
+       });
+       const data = await res.json();
+       if (data.success) {
++        // Persist the mobile so subsequent logins on this device are PIN-only
++        window.localStorage.setItem(MOBILE_KEY, data.user.mobile);
+         login(data.token, data.user);
+         setLocation("/dashboard");
++      } else if (res.status === 401 && data.error === "User not found") {
++        // No account exists for this number -> send user through full setup
++        toast({ title: "No account found", description: "Complete setup to create your account", variant: "destructive" });
++        setLocation("/setup");
+       } else {
+         toast({ title: "Login failed", description: data.error || "Invalid credentials", variant: "destructive" });
+         setPin("");
+@@ -74,6 +96,7 @@
+     if (pin.length === 4) handleLogin();
+   }, [pin]);
+ 
++  // ── Splash screen ─────────────────────────────────────────────────
+   if (!splashDone) {
+     return (
+       <div className="min-h-screen flex flex-col items-center justify-center bg-sidebar">
+@@ -104,18 +127,19 @@
+           <p className="text-muted-foreground text-sm mt-0.5">Construction Site Manager</p>
+         </div>
+ 
+-        {step === "mobile" ? (
++        {step === "recover" ? (
+           <div>
+-            <p className="text-sm font-medium text-foreground mb-4 text-center">Enter your mobile number</p>
++            <p className="text-sm font-medium text-foreground mb-2 text-center">Recover your account</p>
++            <p className="text-xs text-muted-foreground text-center mb-4">Enter your mobile number to sign in with your PIN</p>
+             <div className="text-center mb-6 min-h-[2.5rem]">
+               {mobile.length > 0 ? (
+-                <span className="text-2xl font-semibold tracking-widests text-foreground">{mobile}</span>
++                <span className="text-2xl font-semibold tracking-widest text-foreground">{mobile}</span>
+               ) : (
+                 <span className="text-xl text-muted-foreground tracking-widest">03XXXXXXXXX</span>
+               )}
+             </div>
+             <div className="grid grid-cols-3 gap-3">
+-              {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) =>
++              {NUMPAD.map((d, i) =>
+                 d === "" ? (
+                   <div key={i} />
+                 ) : d === "⌫" ? (
+@@ -141,13 +165,22 @@
+                 )
+               )}
+             </div>
++            <button
++              data-testid="btn-recover-continue"
++              onClick={submitMobile}
++              disabled={loading || mobile.length !== 11}
++              className="w-full mt-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60"
++            >
++              Continue
++            </button>
+             <p className="text-center text-xs text-muted-foreground mt-4">Enter format: 03XXXXXXXXX</p>
+           </div>
+         ) : (
+           <div>
+             <div className="flex items-center justify-between mb-5">
+-              <span className="text-sm text-muted-foreground">{mobile}</span>
+-              <button onClick={() => { setStep("mobile"); setPin(""); }} className="text-primary text-sm font-medium">Change</button>
++              <button onClick={() => { setStep("recover"); setPin(""); }} className="text-primary text-sm font-medium">
++                Change number
++              </button>
+             </div>
+             <p className="text-sm font-medium text-foreground mb-4 text-center">Enter your 4-digit PIN</p>
+             <div className="flex justify-center gap-3 mb-7">
+@@ -159,12 +192,12 @@
+                     pin.length > i ? "border-primary bg-primary" : "border-border bg-background"
+                   )}
+                 >
+-                  {pin.length > i && <div className="w-3 h-3 rounded-circle bg-primary-foreground" />}
++                  {pin.length > i && <div className="w-3 h-3 rounded-full bg-primary-foreground" />}
+                 </div>
+               ))}
+             </div>
+             <div className="grid grid-cols-3 gap-3">
+-              {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) => (
++              {NUMPAD.map((d, i) =>
+                 d === "" ? (
+                   <div key={i} />
+                 ) : d === "⌫" ? (
+@@ -187,7 +220,7 @@
+                     {d}
+                   </button>
+                 )
+-              ))}
++              )}
+             </div>
+             {loading && <p className="text-center text-xs text-muted-foreground mt-4">Logging in...</p>}
+           </div>

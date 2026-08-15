@@ -1,0 +1,11 @@
+--- /home/hassanabbas/Hisab-Kitab/artifacts/hisab-kitab/.hk_tmp/orig_useauth_restored.tsx	2026-08-15 11:38:35.853268887 +0500
++++ /home/hassanabbas/Hisab-Kitab/artifacts/hisab-kitab/src/hooks/use-auth.tsx	2026-08-15 10:57:38.582458560 +0500
+@@ -69,6 +69,8 @@
+   }, [token]);
+ 
+   const login = (newToken: string, newUser: User) => {
++    // Persist the mobile so this device can sign in with PIN only on the next visit
++    window.localStorage.setItem("hk_mobile", newUser.mobile);
+     setAuthToken(newToken);
+     setToken(newToken);
+     setUser({ ...newUser, role: newUser.role || "admin" });
