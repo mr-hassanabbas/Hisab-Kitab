@@ -1,4 +1,4 @@
-import express, { type RequestHandler } from "express";
+import express from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
 import path from "path";
@@ -40,7 +40,8 @@ app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", router);
 
 // Health check endpoint for deployment monitoring
-const healthzHandler: RequestHandler = (_req, res) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const healthzHandler = (_req: any, res: any) => {
      res.json({
        status: "ok",
        timestamp: new Date().toISOString(),
