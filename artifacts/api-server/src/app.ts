@@ -1,6 +1,6 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import cors from "cors";
-import pinoHttp from "pino-http";
+import { pinoHttp } from "pino-http";
 import path from "path";
 import { fileURLToPath } from "url";
 import router from "./routes/index.js";
@@ -40,7 +40,7 @@ app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", router);
 
 // Health check endpoint for deployment monitoring
-app.get("/api/healthz", (_req: Request, res: Response) => {
+app.get("/api/healthz", (_req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -53,3 +53,4 @@ app.get("/api/healthz", (_req: Request, res: Response) => {
 });
 
 export default app;
+

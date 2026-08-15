@@ -1,20 +1,10 @@
 {
-  "buildCommand": "cd artifacts/hisab-kitab && pnpm install --frozen-lockfile=false && pnpm build",
-  "outputDirectory": "artifacts/hisab-kitab/dist",
-  "devCommand": "cd artifacts/hisab-kitab && pnpm dev",
-  "installCommand": "pnpm install --frozen-lockfile=false",
-  "framework": null,
+  "framework": "vite",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/:path*",
       "destination": "http://localhost:3000/api/:path*"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "@database-url",
-    "JWT_SECRET": "@jwt-secret",
-    "OPENROUTER_API_KEY": "@openrouter-api-key",
-    "GROQ_API_KEY": "@groq-api-key",
-    "NODE_ENV": "production"
-  }
+  ]
 }
