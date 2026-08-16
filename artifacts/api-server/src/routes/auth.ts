@@ -24,7 +24,7 @@ router.get("/status", async (req, res) => {
     }
     res.json({ success: true, hasUser: userExists, isAuthenticated: !!user, user, needsSetup: !userExists });
   } catch (e) {
-    res.status(500).json({ success: false, error: "Internal server error" });
+    console.error("AUTH STATUS ERROR:", e); res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 
